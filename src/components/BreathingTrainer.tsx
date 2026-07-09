@@ -23,6 +23,10 @@ export default function BreathingTrainer({
   const [cycleProgress, setCycleProgress] = useState(0); // 0 to 100 for current phase
   const [perfectStreak, setPerfectStreak] = useState(0);
 
+  const targetSphereRef = useRef<HTMLDivElement>(null);
+  const userSphereRef = useRef<HTMLDivElement>(null);
+  const frameCountRef = useRef(0);
+
   const userScaleRef = useRef(1);
   const syncScoreRef = useRef(50);
   const perfectStreakRef = useRef(0);
@@ -169,12 +173,30 @@ export default function BreathingTrainer({
         }
       }
 
-      // Safe asynchronous React state dispatching
-      setBreathState(currentPhase);
-      setCycleProgress(pct);
-      setUserScale(nextUserScale);
-      setSyncScore(nextSyncScore);
-      setPerfectStreak(nextPerfectStreak);
+      // Direct DOM style updates for 60FPS fluid ring/sphere scaling (completely bypasses React Virtual DOM)
+      if (targetSphereRef.current) {
+        targetSphereRef.current.style.width = `${target * 50}px`;
+        targetSphereRef.current.style.height = `${target * 50}px`;
+        targetSphereRef.current.style.borderColor = currentPhase === 'hold' ? '#8b5cf6' : currentPhase === 'exhale' ? '#10b981' : '#06b6d4';
+      }
+      if (userSphereRef.current) {
+        userSphereRef.current.style.width = `${nextUserScale * 50}px`;
+        userSphereRef.current.style.height = `${nextUserScale * 50}px`;
+        userSphereRef.current.style.borderColor = pressing ? '#22d3ee' : '#475569';
+        userSphereRef.current.style.backgroundColor = pressing ? 'rgba(34, 211, 238, 0.05)' : 'transparent';
+      }
+
+      // Throttled local state dispatch to run once every 12 frames (~5 FPS) for static readings/progress bars
+      frameCountRef.current++;
+      if (currentPhase !== breathStateRef.current) {
+        setBreathState(currentPhase);
+      }
+      if (frameCountRef.current % 12 === 0) {
+        setCycleProgress(pct);
+        setUserScale(nextUserScale);
+        setSyncScore(nextSyncScore);
+        setPerfectStreak(nextPerfectStreak);
+      }
 
       // Report to parent if sync value has changed
       const roundedSync = Math.round(nextSyncScore);
@@ -266,6 +288,7 @@ export default function BreathingTrainer({
 
           {/* Glowing Target Ring (Dynamic expand) */}
           <div 
+            ref={targetSphereRef}
             className="absolute rounded-full border-2 border-emerald-500/30 transition-all duration-300 ease-out flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.1)]"
             style={{ 
               width: `${targetScale * 50}px`, 
@@ -279,6 +302,7 @@ export default function BreathingTrainer({
 
           {/* User Breath Outer Sphere (Driven by Mouse Hold) */}
           <div 
+            ref={userSphereRef}
             className="absolute rounded-full border-2 border-dashed transition-transform duration-75 ease-out shadow-[0_0_20px_rgba(34,211,238,0.2)]"
             style={{ 
               width: `${userScale * 50}px`, 

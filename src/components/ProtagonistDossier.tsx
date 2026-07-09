@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Shield, BookOpen, Layers, Award, Terminal } from 'lucide-react';
 import { motion } from 'motion/react';
 import protagonistImg from '../assets/images/cyberpunk_protagonist_1783585627894.jpg';
+import CombatHistoryModal from './CombatHistoryModal';
 
 interface ProtagonistDossierProps {
   isOverdrive: boolean;
@@ -9,6 +10,7 @@ interface ProtagonistDossierProps {
 
 export default function ProtagonistDossier({ isOverdrive }: ProtagonistDossierProps) {
   const [activeTab, setActiveTab] = useState<'backstory' | 'heritage' | 'coat'>('backstory');
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const principles = [
     { title: 'The "Go" (Hard)', desc: 'Hydraulic straight punches and rooted isometric blocking designed to crack armored security exoskeletons.' },
@@ -83,44 +85,55 @@ export default function ProtagonistDossier({ isOverdrive }: ProtagonistDossierPr
       </div>
 
       {/* Dossier Tabs selection */}
-      <div className="flex border-b border-slate-800/80 mb-4 gap-2 text-xs font-mono">
-        <button
-          onClick={() => setActiveTab('backstory')}
-          className={`pb-2 px-1 transition-all duration-200 border-b-2 flex items-center gap-1.5 ${
-            activeTab === 'backstory'
-              ? 'border-cyan-400 text-cyan-300 font-bold'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-          id="tab-backstory"
-        >
-          <BookOpen className="h-3.5 w-3.5" />
-          <span>BACKSTORY</span>
-        </button>
+      <div className="flex flex-wrap items-center justify-between border-b border-slate-800/80 mb-4 gap-2 text-xs font-mono">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab('backstory')}
+            className={`pb-2 px-1 transition-all duration-200 border-b-2 flex items-center gap-1.5 ${
+              activeTab === 'backstory'
+                ? 'border-cyan-400 text-cyan-300 font-bold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+            id="tab-backstory"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            <span>BACKSTORY</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('heritage')}
+            className={`pb-2 px-1 transition-all duration-200 border-b-2 flex items-center gap-1.5 ${
+              activeTab === 'heritage'
+                ? 'border-cyan-400 text-cyan-300 font-bold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+            id="tab-heritage"
+          >
+            <Layers className="h-3.5 w-3.5" />
+            <span>CYBER GOJU-RYU</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('coat')}
+            className={`pb-2 px-1 transition-all duration-200 border-b-2 flex items-center gap-1.5 ${
+              activeTab === 'coat'
+                ? 'border-cyan-400 text-cyan-300 font-bold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+            id="tab-coat"
+          >
+            <Shield className="h-3.5 w-3.5" />
+            <span>MATRIX COAT SPEC</span>
+          </button>
+        </div>
 
         <button
-          onClick={() => setActiveTab('heritage')}
-          className={`pb-2 px-1 transition-all duration-200 border-b-2 flex items-center gap-1.5 ${
-            activeTab === 'heritage'
-              ? 'border-cyan-400 text-cyan-300 font-bold'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-          id="tab-heritage"
+          onClick={() => setIsHistoryOpen(true)}
+          className="pb-2 text-cyan-400 hover:text-cyan-300 hover:border-cyan-400 border-b-2 border-transparent transition-all flex items-center gap-1.5 text-[10px] font-bold"
+          id="tab-combat-history"
         >
-          <Layers className="h-3.5 w-3.5" />
-          <span>CYBER GOJU-RYU</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('coat')}
-          className={`pb-2 px-1 transition-all duration-200 border-b-2 flex items-center gap-1.5 ${
-            activeTab === 'coat'
-              ? 'border-cyan-400 text-cyan-300 font-bold'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-          id="tab-coat"
-        >
-          <Shield className="h-3.5 w-3.5" />
-          <span>MATRIX COAT SPEC</span>
+          <Terminal className="h-3.5 w-3.5 animate-pulse" />
+          <span>COMBAT HISTORY ARCHIVE</span>
         </button>
       </div>
 
@@ -207,6 +220,9 @@ export default function ProtagonistDossier({ isOverdrive }: ProtagonistDossierPr
           </motion.div>
         )}
       </div>
+
+      {/* Combat History Modal Overlay */}
+      <CombatHistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
     </div>
   );
 }
