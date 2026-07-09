@@ -17,74 +17,49 @@ export default function BreathingTrainer({
   triggerIbukiVent,
 }: BreathingTrainerProps) {
   const [breathState, setBreathState] = useState<BreathState>('inhale');
-  const [targetScale, setTargetScale] = useState(1); // 1 to 2.5
   const [userScale, setUserScale] = useState(1);
   const [isPressing, setIsPressing] = useState(false);
   const [syncScore, setSyncScore] = useState(50); // overall sync level 0-100
   const [cycleProgress, setCycleProgress] = useState(0); // 0 to 100 for current phase
   const [perfectStreak, setPerfectStreak] = useState(0);
 
-  const requestRef = useRef<number | null>(null);
-  const lastTimeRef = useRef<number>(Date.now());
   const userScaleRef = useRef(1);
   const syncScoreRef = useRef(50);
   const perfectStreakRef = useRef(0);
+  const lastReportedSyncRef = useRef<number | null>(null);
+  const lastVentTimeRef = useRef(0);
 
-  // Rhythmic breath target cycle loop
+  const isPressingRef = useRef(isPressing);
+  const breathStateRef = useRef(breathState);
+  const triggerIbukiVentRef = useRef(triggerIbukiVent);
+  const onSyncChangeRef = useRef(onSyncChange);
+  const isOverdriveRef = useRef(isOverdrive);
+  const setOverdriveRef = useRef(setOverdrive);
+
+  // Sync refs to state values
   useEffect(() => {
-    const interval = setInterval(() => {
-      setBreathState(prev => {
-        switch (prev) {
-          case 'inhale':
-            return 'hold';
-          case 'hold':
-            return 'exhale';
-          case 'exhale':
-            return 'rest';
-          case 'rest':
-          default:
-            return 'inhale';
-        }
-      });
-      setCycleProgress(0);
-    }, 4000); // 4 seconds per phase
+    isPressingRef.current = isPressing;
+  }, [isPressing]);
 
-    return () => clearInterval(interval);
-  }, []);
-
-  // Update target scale and progress based on state
   useEffect(() => {
-    let progressTimer: NodeJS.Timeout;
-    const startTime = Date.now();
-    const duration = 4000;
-
-    const tick = () => {
-      const elapsed = Date.now() - startTime;
-      const pct = Math.min(100, (elapsed / duration) * 100);
-      setCycleProgress(pct);
-
-      const t = elapsed / duration;
-      setTargetScale(prev => {
-        if (breathState === 'inhale') {
-          return 1 + t * 1.4; // Grows from 1 to 2.4
-        } else if (breathState === 'hold') {
-          return 2.4; // Stays at 2.4
-        } else if (breathState === 'exhale') {
-          return 2.4 - t * 1.4; // Shrinks to 1
-        } else {
-          return 1; // Stays at 1
-        }
-      });
-
-      if (elapsed < duration) {
-        progressTimer = setTimeout(tick, 30);
-      }
-    };
-
-    tick();
-
-    return () => clearTimeout(progressTimer);
+    breathStateRef.current = breathState;
   }, [breathState]);
+
+  useEffect(() => {
+    triggerIbukiVentRef.current = triggerIbukiVent;
+  }, [triggerIbukiVent]);
+
+  useEffect(() => {
+    onSyncChangeRef.current = onSyncChange;
+  }, [onSyncChange]);
+
+  useEffect(() => {
+    isOverdriveRef.current = isOverdrive;
+  }, [isOverdrive]);
+
+  useEffect(() => {
+    setOverdriveRef.current = setOverdrive;
+  }, [setOverdrive]);
 
   // Handle keyboard/Spacebar listener for tactile accessibility
   useEffect(() => {
@@ -111,34 +86,71 @@ export default function BreathingTrainer({
     };
   }, []);
 
-  // Update user scale based on pressing state
+  // Continuous physics and breath cycle calculation loop
   useEffect(() => {
-    const updatePhysics = () => {
-      const now = Date.now();
-      const dt = (now - lastTimeRef.current) / 1000;
-      lastTimeRef.current = now;
+    const cycleStartTime = Date.now();
+    let lastTime = Date.now();
+    let frameId: number;
 
+    const loop = () => {
+      const now = Date.now();
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+
+      // Cycle calculations
+      const totalElapsed = now - cycleStartTime;
+      const cycleElapsed = totalElapsed % 16000; // 16s full cycle
+
+      let currentPhase: BreathState = 'inhale';
+      let phaseElapsed = 0;
+
+      if (cycleElapsed < 4000) {
+        currentPhase = 'inhale';
+        phaseElapsed = cycleElapsed;
+      } else if (cycleElapsed < 8000) {
+        currentPhase = 'hold';
+        phaseElapsed = cycleElapsed - 4000;
+      } else if (cycleElapsed < 12000) {
+        currentPhase = 'exhale';
+        phaseElapsed = cycleElapsed - 8000;
+      } else {
+        currentPhase = 'rest';
+        phaseElapsed = cycleElapsed - 12000;
+      }
+
+      const pct = (phaseElapsed / 4000) * 100;
+
+      // Update user scale smoothly based on physical input
+      const pressing = isPressingRef.current;
       let nextUserScale = userScaleRef.current;
-      if (isPressing) {
-        // Inhaling (expanding)
+      if (pressing) {
         nextUserScale = Math.min(2.4, nextUserScale + dt * 1.8);
       } else {
-        // Exhaling (contracting)
         nextUserScale = Math.max(1.0, nextUserScale - dt * 1.8);
       }
       userScaleRef.current = nextUserScale;
-      setUserScale(nextUserScale);
 
-      // Calculate instantaneous alignment difference
-      const diff = Math.abs(targetScale - nextUserScale);
+      // Compute current target scale matching the visual progress
+      const t = pct / 100;
+      let target;
+      if (currentPhase === 'inhale') {
+        target = 1 + t * 1.4;
+      } else if (currentPhase === 'hold') {
+        target = 2.4;
+      } else if (currentPhase === 'exhale') {
+        target = 2.4 - t * 1.4;
+      } else {
+        target = 1;
+      }
+
+      // Compute instantaneous and smoothed sync alignment
+      const diff = Math.abs(target - nextUserScale);
       const instantSync = Math.max(0, 100 - (diff / 1.4) * 100);
 
-      // Smooth overall sync score
       const nextSyncScore = syncScoreRef.current * 0.96 + instantSync * 0.04;
       syncScoreRef.current = nextSyncScore;
-      setSyncScore(nextSyncScore);
 
-      // Track perfect alignment streaks (alignment score > 90)
+      // Perfect alignment tracker
       let nextPerfectStreak = perfectStreakRef.current;
       if (instantSync > 90) {
         nextPerfectStreak += 1;
@@ -146,39 +158,60 @@ export default function BreathingTrainer({
         nextPerfectStreak = Math.max(0, nextPerfectStreak - 1.5);
       }
       perfectStreakRef.current = nextPerfectStreak;
+
+      // Vent heat safely under sync exhale constraints
+      if (instantSync > 88 && currentPhase === 'exhale' && !pressing) {
+        if (now - lastVentTimeRef.current > 300) {
+          lastVentTimeRef.current = now;
+          if (triggerIbukiVentRef.current) {
+            triggerIbukiVentRef.current();
+          }
+        }
+      }
+
+      // Safe asynchronous React state dispatching
+      setBreathState(currentPhase);
+      setCycleProgress(pct);
+      setUserScale(nextUserScale);
+      setSyncScore(nextSyncScore);
       setPerfectStreak(nextPerfectStreak);
 
-      // If user holds/releases in sync, occasionally help vent heat
-      if (instantSync > 88 && breathState === 'exhale' && isPressing === false) {
-        Promise.resolve().then(() => {
-          triggerIbukiVent();
-        });
+      // Report to parent if sync value has changed
+      const roundedSync = Math.round(nextSyncScore);
+      if (lastReportedSyncRef.current !== roundedSync) {
+        lastReportedSyncRef.current = roundedSync;
+        if (onSyncChangeRef.current) {
+          onSyncChangeRef.current(roundedSync);
+        }
       }
 
-      requestRef.current = requestAnimationFrame(updatePhysics);
-    };
-
-    lastTimeRef.current = Date.now();
-    requestRef.current = requestAnimationFrame(updatePhysics);
-
-    return () => {
-      if (requestRef.current) {
-        cancelAnimationFrame(requestRef.current);
+      // Overdrive trigger checked asynchronously
+      if (nextPerfectStreak > 180 && !isOverdriveRef.current) {
+        if (setOverdriveRef.current) {
+          setOverdriveRef.current(true);
+        }
       }
+
+      frameId = requestAnimationFrame(loop);
     };
-  }, [isPressing, targetScale, breathState, triggerIbukiVent]);
 
-  // Propagate sync score to parent safely during Commit phase
-  useEffect(() => {
-    onSyncChange(Math.round(syncScore));
-  }, [syncScore, onSyncChange]);
+    frameId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(frameId);
+  }, []);
 
-  // Propagate Overdrive status to parent safely when streak requirement is met
-  useEffect(() => {
-    if (perfectStreak > 180 && !isOverdrive) {
-      setOverdrive(true);
+  // Compute target scale derived directly from current render states
+  const targetScale = (() => {
+    const t = cycleProgress / 100;
+    if (breathState === 'inhale') {
+      return 1 + t * 1.4;
+    } else if (breathState === 'hold') {
+      return 2.4;
+    } else if (breathState === 'exhale') {
+      return 2.4 - t * 1.4;
+    } else {
+      return 1;
     }
-  }, [perfectStreak, isOverdrive, setOverdrive]);
+  })();
 
   const stateDetails = {
     inhale: {

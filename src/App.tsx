@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { CombatStats, CombatMove, COMBAT_MOVES, CYBER_MODULES } from './types';
 import ProtagonistDossier from './components/ProtagonistDossier';
 import CombatSimulator from './components/CombatSimulator';
@@ -64,7 +64,7 @@ export default function App() {
   }, [activeModules, syncScore, isOverdrive, currentHeat]);
 
   // Handle installing/uninstalling modular cybernetic arm parts
-  const handleToggleModule = (id: string) => {
+  const handleToggleModule = useCallback((id: string) => {
     setActiveModules(prev => {
       if (prev.includes(id)) {
         return prev.filter(mId => mId !== id);
@@ -72,10 +72,10 @@ export default function App() {
         return [...prev, id];
       }
     });
-  };
+  }, []);
 
   // Triggered when a combat move starts executing
-  const handleMoveTrigger = (move: CombatMove) => {
+  const handleMoveTrigger = useCallback((move: CombatMove) => {
     setSelectedMove(move);
 
     if (move.id === 'ibuki') {
@@ -102,12 +102,12 @@ export default function App() {
     setTimeout(() => {
       setSelectedMove(null);
     }, move.duration);
-  };
+  }, [activeModules]);
 
   // Trigger continuous light cooling during rhythmic respiration exhales
-  const triggerIbukiVent = () => {
+  const triggerIbukiVent = useCallback(() => {
     setCurrentHeat(prev => Math.max(0, prev - 1.2));
-  };
+  }, []);
 
   // Passive ambient heat dissipation over time
   useEffect(() => {
