@@ -1,0 +1,6 @@
+{
+  "name": "Cyberpunk Goju-Ryu Karate Protagonist",
+  "description": "An interactive character dossier, tactical combat simulator, and technical specifications panel for a cyberpunk Goju-Ryu karate protagonist equipped with a precision cybernetic arm and a Matrix-style coat.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
